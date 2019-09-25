@@ -1,5 +1,5 @@
 import pygame, sys,time
-from pygame.locals import QUIT
+from pygame.locals import QUIT, KEYDOWN, K_LEFT, K_RIGHT, K_a, K_d
 BLUE=(0,0,155)
 BOX_SIZE=20
 SCREEN_WIDTH=640
@@ -10,15 +10,15 @@ def run_tetris_game():
     pygame.init()
 
     screen = pygame.display.set_mode((SCREEN_WIDTH,SCREEN_HEIGHT))
-    pygame.display.set_caption('MY TERIS')
+    pygame.display.set_caption('MY TETRIS')
     game_matrix=create_game_matrix()
     last_movement_t=time.time()
     piece=create_piece()
-
+    score=0
     while True:
         screen.fill((0, 0, 0))
         ###move piece
-        if(time.time()-last_movement_t>1):
+        if(time.time()-last_movement_t>0.1):
             piece['row']= piece['row']+1
             last_movement_t=time.time()
         #-------------#
@@ -26,19 +26,69 @@ def run_tetris_game():
         pygame.draw.rect(
         screen,
         BLUE,
-        [100,50,10*20,20*20-10],5)
+        [100,50,10*20+10,20*20+10],5)
         ##BOARD
         draw_board(screen,game_matrix)
+        draw_score(screen,score)
+        user_input(game_matrix,piece)
         ## if piece reaches the bottom -> new
         if (piece['row'] == 19 or game_matrix[piece['row']+1][piece['column']]!='.'):
             game_matrix[piece['row']][piece['column']] = 'c'
+            lines_removed=remove_line(game_matrix)
+            score += lines_removed
             piece=create_piece()
         ##-----------#
         pygame.display.update()
         for event in pygame.event.get(QUIT):
             pygame.quit()
             sys.exit()
-#
+
+
+def draw_score(screen,score):
+    font=pygame.font.Font('freesansbold.ttf',18)
+    scoreSurf=font.render('Score: %s' % score,True,(255,255,255))
+    screen.blit(scoreSurf,(640 - 150,20))
+
+
+def remove_line(game_matrix):
+    num_lines_removed=0
+    for row in range(20):
+        if(check_line_full(game_matrix,row)):
+            for row_to_move_down in range(row,0,-1): # from full row to top
+                for column in range(10):
+                    game_matrix[row_to_move_down][column] = game_matrix[row_to_move_down-1][column]
+            #set top to blank
+            for x in range(10):
+                game_matrix[0][x] = '.'
+            num_lines_removed+=1
+    return num_lines_removed
+
+
+
+def check_line_full(game_matrix,row):
+    for column in range(10):
+        if game_matrix[row][column] == '.':
+            return False
+    return True
+
+
+
+
+def user_input(game_matrix,piece):
+    for event in pygame.event.get():
+        if event.type==KEYDOWN :
+            if(event.key==K_LEFT) and check_valid_position(game_matrix,piece['row'],piece['column']-1):
+                piece['column']-=1
+            elif(event.key==K_RIGHT) and check_valid_position(game_matrix,piece['row'],piece['column']+1):
+                piece['column']+=1
+            #
+def check_valid_position(game_matrix,row,column):
+    if not(column >= 0 and column <10 and row <20):
+        return False
+    if game_matrix[row][column] != '.':
+        return False
+    return True
+    #
 def create_piece():
     piece={}
     piece['row']= 0
