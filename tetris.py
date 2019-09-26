@@ -1,10 +1,46 @@
-import pygame, sys,time
-from pygame.locals import QUIT, KEYDOWN, K_LEFT, K_RIGHT, K_a, K_d
-BLUE=(0,0,155)
+import pygame, sys,time,random
+from pygame.locals import QUIT, KEYDOWN, K_LEFT, K_RIGHT, K_a, K_d,K_UP
+BLUE=(0 ,0 ,155)
 BOX_SIZE=20
 SCREEN_WIDTH=640
 SCREEN_HEIGHT=480
 BOARD_WIDTH=10
+score=0
+
+S_SHAPE_TEMPLATE = [['.....',
+                     '.....',
+                     '..cc.',
+                     '.cc..',
+                     '.....'],
+                    ['.....',
+                     '..c..',
+                     '..cc.',
+                     '...c.',
+                     '.....']]
+
+I_SHAPE_TEMPLATE = [['..c..',
+                     '..c..',
+                     '..c..',
+                     '..c..',
+                     '.....'],
+                   ['.....',
+                    '.....',
+                    'cccc.',
+                    '.....',
+                    '.....']]
+
+O_SHAPE_TEMPLATE = [['.....',
+                     '.....',
+                     '.cc..',
+                     '.cc..',
+                     '.....']]
+
+def available_pieces():
+        return{
+            'S':S_SHAPE_TEMPLATE,
+            'I':I_SHAPE_TEMPLATE,
+            'O':O_SHAPE_TEMPLATE
+        }
 
 def run_tetris_game():
     pygame.init()
@@ -18,7 +54,7 @@ def run_tetris_game():
     while True:
         screen.fill((0, 0, 0))
         ###move piece
-        if(time.time()-last_movement_t>0.1):
+        if(time.time()-last_movement_t>0.3):
             piece['row']= piece['row']+1
             last_movement_t=time.time()
         #-------------#
@@ -30,10 +66,11 @@ def run_tetris_game():
         ##BOARD
         draw_board(screen,game_matrix)
         draw_score(screen,score)
+
         user_input(game_matrix,piece)
         ## if piece reaches the bottom -> new
-        if (piece['row'] == 19 or game_matrix[piece['row']+1][piece['column']]!='.'):
-            game_matrix[piece['row']][piece['column']] = 'c'
+        if (not check_valid_position(game_matrix,piece,adjRow=1)):
+            game_matrix = update_game_matrix(game_matrix,piece)
             lines_removed=remove_line(game_matrix)
             score += lines_removed
             piece=create_piece()
@@ -43,6 +80,48 @@ def run_tetris_game():
             pygame.quit()
             sys.exit()
 
+    #
+def create_piece():
+    piece = {}
+    random_shape = random.choice(list(available_pieces().keys()))
+    piece['shape'] = random_shape
+    piece['rotate'] = 0
+    piece['column'] = 2  # update from 4
+    piece['row'] = 0
+    return piece
+
+
+def draw_moving_piece(screen,piece):
+
+    shape_to_draw = available_pieces()[piece['shape']][piece['rotate']]
+    for row in range(5):
+        for col in range(5):
+            if shape_to_draw[row][col]!='.':
+                draw_single_box(screen,piece['row']+row,piece['column']+col,(255,255,255),(217,222,226))
+
+
+
+def update_game_matrix(matrix, piece):
+    for row in range(5):
+        for col in range(5):
+            if(available_pieces()[piece['shape']][piece['rotate']][row][col] != '.'):
+                matrix[piece['row']+row][piece['column']+col] = 'c'
+    return matrix
+
+def check_valid_position(game_matrix,piece,adjColumn=0,adjRow=0):
+    piece_matrix = available_pieces()[piece['shape']][piece['rotate']]
+    for row in range(5):
+        for col in range(5):
+            if piece_matrix[row][col] == '.':
+                continue
+            if not isOnBoard(piece['row']+ row + adjRow, piece['column']+ col + adjColumn):
+                return False
+            if game_matrix[piece['row']+ row + adjRow][piece['column'] +col + adjColumn] != '.':
+                return False
+
+    return True
+
+#############
 
 def draw_score(screen,score):
     font=pygame.font.Font('freesansbold.ttf',18)
@@ -64,38 +143,27 @@ def remove_line(game_matrix):
     return num_lines_removed
 
 
-
 def check_line_full(game_matrix,row):
     for column in range(10):
         if game_matrix[row][column] == '.':
             return False
     return True
 
-
-
-
 def user_input(game_matrix,piece):
     for event in pygame.event.get():
-        if event.type==KEYDOWN :
-            if(event.key==K_LEFT) and check_valid_position(game_matrix,piece['row'],piece['column']-1):
-                piece['column']-=1
-            elif(event.key==K_RIGHT) and check_valid_position(game_matrix,piece['row'],piece['column']+1):
-                piece['column']+=1
-            #
-def check_valid_position(game_matrix,row,column):
-    if not(column >= 0 and column <10 and row <20):
-        return False
-    if game_matrix[row][column] != '.':
-        return False
-    return True
-    #
-def create_piece():
-    piece={}
-    piece['row']= 0
-    piece['column']=4
-
-    return piece
-#######
+        if event.type == KEYDOWN:
+            if (event.key == K_LEFT ) and check_valid_position(game_matrix,piece,adjColumn=-1):
+                piece['column'] -= 1
+            elif (event.key == K_RIGHT ) and check_valid_position(game_matrix,piece,adjColumn=1):
+                piece['column'] += 1
+            elif(event.key == K_UP):
+                piece['rotate']=(piece['rotate']+1) % len(available_pieces()[piece['shape']])
+                if not check_valid_position(game_matrix,piece):
+                    piece['rotate']=(piece['rotate']-1) % len(available_pieces()[piece['shape']])
+            ############
+def isOnBoard(row, column):
+    return column >= 0 and column < 10 and row < 20
+    #######
 def draw_board(screen,matrix):
     game_matrix_columns=10
     game_matrix_rows=20
@@ -103,10 +171,7 @@ def draw_board(screen,matrix):
         for column in range(game_matrix_columns):
             if(matrix[row][column]!='.'):
                 draw_single_box(screen,row,column,(255,255,255),(217,222,226))
-########
-def draw_moving_piece(screen,piece):
-    draw_single_box(screen,piece['row'],piece['column'],(255.255,255),(217,222,226))
-#############
+
 def draw_single_box(screen,matrix_cell_row, matrix_cell_column,color,shadow_color):
     origin_x= 100 +5 + (matrix_cell_column*20+1)
     origin_y=50 + 5 + (matrix_cell_row *20+1)
